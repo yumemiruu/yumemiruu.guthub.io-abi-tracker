@@ -74,6 +74,7 @@ textarea:focus{border-color:#758000}
       <button class="tab active" onclick="showTab('raid',this)">Raid</button>
       <button class="tab" onclick="showTab('dashboard',this)">Dashboard</button>
       <button class="tab" onclick="showTab('history',this)">History</button>
+      <button class="tab" onclick="showTab('calc',this)">Calculator</button>
       <button class="themeBtn" id="themeBtn" onclick="toggleTheme()">🌙 Dark</button>
     </div>
   </div>
@@ -87,6 +88,7 @@ textarea:focus{border-color:#758000}
       </div>
       <input id="sessionName" placeholder="Session name (optional)" style="width:180px">
       <button class="secondary" id="sessionBtn" onclick="toggleSession()">Start Session</button>
+      <button class="secondary" id="redBtn" onclick="addRed()" style="color:var(--bad);font-weight:800">🔴 +1 Red</button>
     </div>
     <div class="sessionStats" id="sessionStats"></div>
   </div>
@@ -187,7 +189,7 @@ textarea:focus{border-color:#758000}
 
     <div class="card sessionList" style="margin-top:18px">
       <h2>Sessions</h2>
-      <div style="overflow:auto"><table><thead><tr><th>Session</th><th>Started</th><th>Duration</th><th>Raids</th><th>Profit</th></tr></thead><tbody id="sessionBody"><tr><td colspan="5" class="muted">No sessions logged yet.</td></tr></tbody></table></div>
+      <div style="overflow:auto"><table><thead><tr><th>Session</th><th>Started</th><th>Duration</th><th>Idle</th><th>Raids</th><th>Reds</th><th>Profit</th></tr></thead><tbody id="sessionBody"><tr><td colspan="7" class="muted">No sessions logged yet.</td></tr></tbody></table></div>
     </div>
   </section>
 
@@ -202,6 +204,34 @@ textarea:focus{border-color:#758000}
       </div>
       <div style="overflow:auto"><table><thead><tr><th>#</th><th>Session</th><th>Type</th><th>Kit</th><th>Loot</th><th>Profit</th><th>Worth it?</th><th>Status</th><th>Notes</th></tr></thead><tbody id="historyBody"></tbody></table></div>
       <div class="actions"><button class="secondary" onclick="exportCSV()">Export CSV</button><button class="danger secondary" onclick="clearHistory()">Clear history</button></div>
+    </div>
+  </section>
+
+  <section id="calc" class="hidden">
+    <div class="card" style="max-width:340px;margin:auto">
+      <h2>Calculator</h2>
+      <input id="calcDisplay" readonly style="font-size:28px;text-align:right;font-weight:800;padding:16px;margin-bottom:12px" value="0">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <button class="secondary" onclick="calcClear()">C</button>
+        <button class="secondary" onclick="calcBackspace()">⌫</button>
+        <button class="secondary" onclick="calcInput('%')">%</button>
+        <button class="secondary" onclick="calcInput('/')" style="color:var(--accent)">÷</button>
+        <button class="secondary" onclick="calcInput('7')">7</button>
+        <button class="secondary" onclick="calcInput('8')">8</button>
+        <button class="secondary" onclick="calcInput('9')">9</button>
+        <button class="secondary" onclick="calcInput('*')" style="color:var(--accent)">×</button>
+        <button class="secondary" onclick="calcInput('4')">4</button>
+        <button class="secondary" onclick="calcInput('5')">5</button>
+        <button class="secondary" onclick="calcInput('6')">6</button>
+        <button class="secondary" onclick="calcInput('-')" style="color:var(--accent)">−</button>
+        <button class="secondary" onclick="calcInput('1')">1</button>
+        <button class="secondary" onclick="calcInput('2')">2</button>
+        <button class="secondary" onclick="calcInput('3')">3</button>
+        <button class="secondary" onclick="calcInput('+')" style="color:var(--accent)">+</button>
+        <button class="secondary" onclick="calcInput('0')" style="grid-column:span 2">0</button>
+        <button class="secondary" onclick="calcInput('.')">.</button>
+        <button class="primary" style="margin:0" onclick="calcEquals()">=</button>
+      </div>
     </div>
   </section>
 </div>
@@ -262,25 +292,47 @@ function useManualKit(){
  }
 }
 
+const IDLE_MS=30*60*1000;
+let redCount=+localStorage.getItem('abiRedCount')||0;
+
 function toggleSession(){
  if(activeSession){ endSession(); } else { startSession(); }
 }
 function startSession(){
  const name=document.getElementById('sessionName').value.trim()||('Session '+(sessions.length+1));
- activeSession={id:Date.now(),name,start:Date.now(),raidIds:[]};
+ activeSession={id:Date.now(),name,start:Date.now(),lastActivity:Date.now(),redCount:0,raidIds:[]};
  localStorage.setItem('abiActiveSession',JSON.stringify(activeSession));
  renderSessionBar();
+}
+function sessionIdleMs(session,raidsInSession,endTime){
+ const marks=[session.start,...raidsInSession.map(r=>r.ts).sort((a,b)=>a-b),endTime];
+ let idle=0;
+ for(let i=1;i<marks.length;i++){
+  const gap=marks[i]-marks[i-1];
+  if(gap>IDLE_MS)idle+=(gap-IDLE_MS);
+ }
+ return idle;
 }
 function endSession(){
  if(!activeSession)return;
  const raidsInSession=raids.filter(r=>r.sessionId===activeSession.id);
  const profit=raidsInSession.reduce((a,r)=>a+r.profit,0);
- sessions.unshift({...activeSession,end:Date.now(),raidCount:raidsInSession.length,profit});
+ const end=Date.now();
+ const idleMs=sessionIdleMs(activeSession,raidsInSession,end);
+ sessions.unshift({...activeSession,end,raidCount:raidsInSession.length,profit,idleMs});
  localStorage.setItem('abiSessions',JSON.stringify(sessions));
  activeSession=null;
  localStorage.removeItem('abiActiveSession');
  document.getElementById('sessionName').value='';
  renderSessionBar();renderDashboard();
+}
+function addRed(){
+ redCount++;
+ localStorage.setItem('abiRedCount',redCount);
+ if(!activeSession)startSession();
+ activeSession.redCount=(activeSession.redCount||0)+1;
+ localStorage.setItem('abiActiveSession',JSON.stringify(activeSession));
+ renderSessionBar();
 }
 function fmtDuration(ms){
  const s=Math.floor(ms/1000);const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
@@ -293,21 +345,30 @@ function renderSessionBar(){
  if(timerInterval)clearInterval(timerInterval);
  if(activeSession){
    dot.classList.add('live');
-   label.textContent=activeSession.name;
    btn.textContent='End Session';
    document.getElementById('sessionName').style.display='none';
-   const tick=()=>{ timer.textContent=fmtDuration(Date.now()-activeSession.start); };
+   const tick=()=>{
+    timer.textContent=fmtDuration(Date.now()-activeSession.start);
+    const idleNow=Date.now()-activeSession.lastActivity;
+    if(idleNow>IDLE_MS){
+     dot.classList.remove('live');dot.style.background='var(--warn)';
+     label.textContent=activeSession.name+' — ⏸ possibly idle ('+fmtDuration(idleNow)+')';
+    }else{
+     dot.style.background='';dot.classList.add('live');
+     label.textContent=activeSession.name;
+    }
+   };
    tick(); timerInterval=setInterval(tick,1000);
    const raidsInSession=raids.filter(r=>r.sessionId===activeSession.id);
    const profit=raidsInSession.reduce((a,r)=>a+r.profit,0);
-   stats.innerHTML=`<div class="mini">RAIDS<b>${raidsInSession.length}</b></div><div class="mini">SESSION PROFIT<b class="${profit>=0?'good':'bad'}">${profit>=0?'+':''}${money(profit)}</b></div>`;
+   stats.innerHTML=`<div class="mini">RAIDS<b>${raidsInSession.length}</b></div><div class="mini">SESSION PROFIT<b class="${profit>=0?'good':'bad'}">${profit>=0?'+':''}${money(profit)}</b></div><div class="mini">REDS THIS SESSION<b style="color:var(--bad)">${activeSession.redCount||0}</b></div><div class="mini">TOTAL REDS<b style="color:var(--bad)">${redCount}</b></div>`;
  }else{
-   dot.classList.remove('live');
+   dot.classList.remove('live');dot.style.background='';
    label.textContent='No active session';
    timer.textContent='—';
    btn.textContent='Start Session';
    document.getElementById('sessionName').style.display='';
-   stats.innerHTML='';
+   stats.innerHTML=`<div class="mini">TOTAL REDS<b style="color:var(--bad)">${redCount}</b></div>`;
  }
 }
 
@@ -348,6 +409,8 @@ function calculate(){
  document.getElementById('vBreakEven').textContent=money(v.breakEven);
 
  if(!activeSession)startSession();
+ activeSession.lastActivity=Date.now();
+ localStorage.setItem('abiActiveSession',JSON.stringify(activeSession));
  const beforeTotal=raids.reduce((a,r)=>a+r.profit,0);
  raids.unshift({type,kit,loot,extra,profit,status,notes,date:new Date().toLocaleString(),ts:Date.now(),sessionId:activeSession.id,sessionName:activeSession.name,worthIt:v.tag});
  localStorage.setItem('abiRaids',JSON.stringify(raids));
@@ -395,8 +458,9 @@ function renderDashboard(){
  const worthCount=raids.filter(r=>r.worthIt==='WORTH IT').length;
  const earned=raids.reduce((a,r)=>a+(r.profit>0?r.profit:0),0);
  const lost=raids.reduce((a,r)=>a+(r.profit<0?-r.profit:0),0);
- const allSessions=activeSession?[...sessions,{...activeSession,end:Date.now()}]:sessions;
- const totalMs=allSessions.reduce((a,s)=>a+((s.end||Date.now())-s.start),0);
+ const liveIdle=activeSession?sessionIdleMs(activeSession,raids.filter(r=>r.sessionId===activeSession.id),Date.now()):0;
+ const allSessions=activeSession?[...sessions,{...activeSession,end:Date.now(),idleMs:liveIdle}]:sessions;
+ const totalMs=allSessions.reduce((a,s)=>a+Math.max(((s.end||Date.now())-s.start)-(s.idleMs||0),0),0);
  const totalHours=totalMs/3600000;
  document.getElementById('dTotalProfit').textContent=(total>=0?'+':'')+money(total);
  document.getElementById('dTotalProfit').className='value '+(total>=0?'good':'bad');
@@ -511,23 +575,51 @@ function renderSessionsTable(){
  const list=[...sessions];
  if(activeSession){
   const raidsInSession=raids.filter(r=>r.sessionId===activeSession.id);
-  list.unshift({...activeSession,end:null,raidCount:raidsInSession.length,profit:raidsInSession.reduce((a,r)=>a+r.profit,0)});
+  const idleMs=sessionIdleMs(activeSession,raidsInSession,Date.now());
+  list.unshift({...activeSession,end:null,raidCount:raidsInSession.length,profit:raidsInSession.reduce((a,r)=>a+r.profit,0),idleMs});
  }
- if(list.length===0){body.innerHTML='<tr><td colspan="5" class="muted">No sessions logged yet.</td></tr>';return;}
+ if(list.length===0){body.innerHTML='<tr><td colspan="7" class="muted">No sessions logged yet.</td></tr>';return;}
  body.innerHTML='';
  list.forEach(s=>{
   const tr=document.createElement('tr');
   const dur=s.end?fmtDuration(s.end-s.start):fmtDuration(Date.now()-s.start)+' (live)';
-  tr.innerHTML=`<td>${s.name}</td><td>${new Date(s.start).toLocaleString()}</td><td>${dur}</td><td>${s.raidCount}</td><td class="${s.profit>=0?'good':'bad'}">${s.profit>=0?'+':''}${money(s.profit)}</td>`;
+  const idle=s.idleMs>0?fmtDuration(s.idleMs):'—';
+  tr.innerHTML=`<td>${s.name}</td><td>${new Date(s.start).toLocaleString()}</td><td>${dur}</td><td class="muted">${idle}</td><td>${s.raidCount}</td><td style="color:var(--bad)">${s.redCount||0}</td><td class="${s.profit>=0?'good':'bad'}">${s.profit>=0?'+':''}${money(s.profit)}</td>`;
   body.appendChild(tr);
  });
 }
 
 function showTab(id,btn){
- ['raid','dashboard','history'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
+ ['raid','dashboard','history','calc'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
  if(id==='history')renderHistory();
  if(id==='dashboard')renderDashboard();
+}
+let calcExpr='';
+function calcInput(v){
+ const ops=['+','-','*','/','%'];
+ if(ops.includes(v)&&(calcExpr===''||ops.includes(calcExpr.slice(-1)))){
+  if(calcExpr==='')return;
+  calcExpr=calcExpr.slice(0,-1)+v;
+ }else{
+  calcExpr+=v;
+ }
+ document.getElementById('calcDisplay').value=calcExpr||'0';
+}
+function calcClear(){calcExpr='';document.getElementById('calcDisplay').value='0';}
+function calcBackspace(){calcExpr=calcExpr.slice(0,-1);document.getElementById('calcDisplay').value=calcExpr||'0';}
+function calcEquals(){
+ if(!calcExpr)return;
+ try{
+  if(!/^[0-9+\-*/.%\s]+$/.test(calcExpr))throw new Error('bad input');
+  const result=Function('"use strict";return ('+calcExpr.replace(/%/g,'/100*')+')')();
+  if(!isFinite(result))throw new Error('bad result');
+  calcExpr=String(Math.round(result*1e6)/1e6);
+  document.getElementById('calcDisplay').value=calcExpr;
+ }catch(e){
+  document.getElementById('calcDisplay').value='Error';
+  calcExpr='';
+ }
 }
 function clearHistory(){if(confirm("Delete all saved raid history, sessions, and goal progress?")){raids=[];sessions=[];activeSession=null;localStorage.removeItem('abiRaids');localStorage.removeItem('abiSessions');localStorage.removeItem('abiActiveSession');renderHistory();renderSessionBar();renderDashboard();}}
 function exportCSV(){
