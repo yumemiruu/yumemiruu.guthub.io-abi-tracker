@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ABI Raid Profit Tracker</title>
+<style>
+:root{--bg:#0d0f12;--panel:#15181d;--panel2:#1c2027;--text:#eef1f5;--muted:#929aa6;--line:#2a3038;--accent:#d9ff3f;--good:#55e38a;--bad:#ff6262;--warn:#ffb84f}
+body.light{--bg:#f4f5f7;--panel:#ffffff;--panel2:#eef0f3;--text:#14171c;--muted:#5c6470;--line:#dde1e6;--accent:#7a8f00;--good:#1f9d5c;--bad:#d13b3b;--warn:#b5720b}
+body.light{background:radial-gradient(circle at top,#ffffff 0,#eef0f3 42%)}
+body.light .tab.active{color:#fff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#20262d 0,#0d0f12 42%);color:var(--text);font-family:Inter,system-ui,Arial,sans-serif;transition:background .2s,color .2s}
+.themeBtn{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer}
+.container{max-width:1100px;margin:auto;padding:28px 18px 50px}.top{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:24px;flex-wrap:wrap}
+h1{margin:0;font-size:32px}.sub{color:var(--muted);margin-top:6px}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tab{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer}.tab.active{background:var(--accent);color:#111;border-color:var(--accent);font-weight:800}
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.card{background:rgba(21,24,29,.94);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 10px 35px #0005}
+h2{font-size:18px;margin:0 0 15px}.rows{display:grid;gap:9px}.row{display:grid;grid-template-columns:1fr 150px;gap:9px}
+input,select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--text);padding:11px;font-size:14px;outline:none}input:focus,select:focus{border-color:#758000}
+.total{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);margin-top:14px;padding-top:15px}.big{font-size:26px;font-weight:900}.muted{color:var(--muted)}
+button.primary{width:100%;border:0;border-radius:10px;background:var(--accent);color:#111;font-weight:900;padding:13px;cursor:pointer;margin-top:15px}
+button.secondary{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px;border-radius:9px;cursor:pointer}
+button.danger{border:1px solid #5a2a2a;background:#241414;color:#ff8a8a}
+.result{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{background:var(--panel2);border:1px solid var(--line);padding:14px;border-radius:11px}.label{color:var(--muted);font-size:12px;letter-spacing:.03em}.value{font-size:20px;font-weight:800;margin-top:4px}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.hidden{display:none}.history{margin-top:18px}.history table{width:100%;border-collapse:collapse}.history th,.history td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line);font-size:13px}.history th{color:var(--muted)}
+.actions{display:flex;gap:8px;margin-top:14px}.actions button{flex:1}.note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:12px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.top{align-items:start;flex-direction:column}.row{grid-template-columns:1fr 120px}}
+
+.sessionBar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:rgba(21,24,29,.94);border:1px solid var(--line);border-radius:16px;padding:16px 20px;margin-bottom:18px}
+.sessionBar .left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.live{background:var(--good);box-shadow:0 0 0 4px rgba(85,227,138,.18)}
+.sessionStats{display:flex;gap:18px;flex-wrap:wrap}
+.sessionStats .mini{font-size:12px;color:var(--muted)}
+.sessionStats .mini b{display:block;color:var(--text);font-size:15px;font-weight:800;margin-top:2px}
+.sessionBar select,.sessionBar input{width:auto}
+
+.verdict{margin-top:14px;padding:16px 18px;border-radius:11px;border:1px solid var(--line);font-size:14px;display:flex;flex-direction:column;align-items:flex-start}
+.verdict.good{background:rgba(85,227,138,.08);border-color:#2c5c43}
+.verdict.bad{background:rgba(255,98,98,.08);border-color:#5c2c2c}
+.verdict.warn{background:rgba(255,184,79,.08);border-color:#5c4a2c}
+.verdict .tag{font-weight:900}
+
+.goalRow{display:flex;gap:8px;margin-bottom:12px}
+.goalRow input{flex:1}
+.barTrack{height:16px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.barFill{height:100%;background:linear-gradient(90deg,#758000,var(--accent));width:0%;transition:width .3s}
+.goalMeta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:8px}
+
+.graphWrap{margin-top:16px}
+svg.graph{width:100%;height:170px;display:block}
+.graph .line{fill:none;stroke:var(--accent);stroke-width:2}
+.graph .area{fill:url(#gGrad);opacity:.5}
+.graph .goalLine{stroke:var(--warn);stroke-width:1;stroke-dasharray:4 4}
+.graph .zero{stroke:var(--line);stroke-width:1}
+.graph text{fill:var(--muted);font-size:10px}
+
+.dashGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+@media(max-width:800px){.dashGrid{grid-template-columns:repeat(2,1fr)}}
+.sessionList table{width:100%;border-collapse:collapse}
+.sessionList th,.sessionList td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line);font-size:13px}
+.sessionList th{color:var(--muted)}
+.streakRow{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.streakRow .stat{flex:1;min-width:150px}
+.pace{font-size:13px;color:var(--muted);margin-top:10px}
+textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--text);padding:11px;font-size:14px;outline:none;font-family:inherit;resize:vertical;min-height:56px}
+textarea:focus{border-color:#758000}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top">
+    <div><h1>ABI Raid Profit Tracker</h1><div class="sub">Arena Breakout: Infinite — track kit, loot, and real Koen profit.</div></div>
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('raid',this)">Raid</button>
+      <button class="tab" onclick="showTab('dashboard',this)">Dashboard</button>
+      <button class="tab" onclick="showTab('history',this)">History</button>
+      <button class="themeBtn" id="themeBtn" onclick="toggleTheme()">🌙 Dark</button>
+    </div>
+  </div>
+
+  <div class="sessionBar">
+    <div class="left">
+      <span class="dot" id="sessionDot"></span>
+      <div>
+        <div class="muted" style="font-size:12px" id="sessionLabel">No active session</div>
+        <div id="sessionTimer" style="font-weight:800;font-size:15px">—</div>
+      </div>
+      <input id="sessionName" placeholder="Session name (optional)" style="width:180px">
+      <button class="secondary" id="sessionBtn" onclick="toggleSession()">Start Session</button>
+    </div>
+    <div class="sessionStats" id="sessionStats"></div>
+  </div>
+
+  <section id="raid">
+    <div class="grid">
+      <div class="card">
+        <h2>1. Enter your kit</h2>
+        <label class="muted">Kit value</label>
+        <div style="display:flex;gap:8px;margin-top:7px">
+          <input id="manualKit" type="number" min="0" placeholder="Enter total kit value manually">
+          <button class="secondary" onclick="useManualKit()">Use</button>
+        </div>
+        <div class="note">Use a manual value if you already know your total kit cost. Leave it blank to calculate from individual items.</div>
+        <div class="rows" id="kitRows"></div>
+        <div class="total"><span class="muted">Total kit value</span><span class="big" id="kitTotal">0</span></div>
+        <button class="secondary" onclick="addKitRow()">+ Add item</button>
+        <div class="note" id="carryNote">Your kit value carries over into your next raid as long as you keep extracting. It only resets when you log a <b>Died</b> result.</div>
+      </div>
+
+      <div class="card">
+        <h2>2. Enter raid results</h2>
+        <label class="muted">Raid type</label>
+        <select id="raidType" style="margin:7px 0 12px"><option>PvE</option><option>Normal</option><option>Lockdown</option><option>Forbidden</option><option>Other</option></select>
+        <label class="muted">Loot value extracted</label>
+        <input id="loot" type="number" min="0" placeholder="e.g. 3200000" style="margin-top:7px">
+        <label class="muted" style="display:block;margin-top:12px">Extra costs (ammo/meds/fees/etc.)</label>
+        <input id="extra" type="number" min="0" placeholder="Optional">
+        <label class="muted" style="display:block;margin-top:12px">Result</label>
+        <select id="status" style="margin-top:7px"><option value="Extracted">Extracted</option><option value="Died">Died</option><option value="Partial">Partial / Lost Gear</option></select>
+        <label class="muted" style="display:block;margin-top:12px">Notes (optional)</label>
+        <textarea id="notes" placeholder="e.g. got third-partied at extract, should've left earlier"></textarea>
+        <button class="primary" onclick="calculate()">Calculate & Save Raid</button>
+        <div class="note">Profit = extracted loot − kit value − extra costs. If you die, loot defaults to 0 unless you enter recovered/sold value.</div>
+      </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <h2>Raid result</h2>
+        <div class="result">
+          <div class="stat"><div class="label">KIT</div><div class="value" id="rKit">0</div></div>
+          <div class="stat"><div class="label">LOOT</div><div class="value" id="rLoot">0</div></div>
+          <div class="stat"><div class="label">TOTAL COST</div><div class="value" id="rCost">0</div></div>
+          <div class="stat"><div class="label">PROFIT / LOSS</div><div class="value" id="rProfit">0</div></div>
+        </div>
+        <div class="verdict hidden" id="verdictBox">
+          <div id="verdictBadge" style="font-size:22px;font-weight:900;letter-spacing:.02em">—</div>
+          <div class="dashGrid" style="grid-template-columns:repeat(4,1fr);width:100%;margin:10px 0 0">
+            <div class="stat"><div class="label">PROFIT / LOSS</div><div class="value" id="vProfit">0</div></div>
+            <div class="stat"><div class="label">KIT COST</div><div class="value" id="vKitCost">0</div></div>
+            <div class="stat"><div class="label">ROI %</div><div class="value" id="vRoi">0%</div></div>
+            <div class="stat"><div class="label">BREAK-EVEN LOOT</div><div class="value" id="vBreakEven">0</div></div>
+          </div>
+          <div class="muted" id="verdictText" style="font-size:13px;margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="dashboard" class="hidden">
+    <div class="streakRow">
+      <div class="stat"><div class="label">CURRENT STREAK</div><div class="value" id="dStreak">—</div></div>
+      <div class="stat"><div class="label">BEST RAID</div><div class="value good" id="dBest">—</div></div>
+      <div class="stat"><div class="label">WORST RAID</div><div class="value bad" id="dWorst">—</div></div>
+    </div>
+    <div class="dashGrid">
+      <div class="stat"><div class="label">TOTAL PROFIT (ALL RAIDS)</div><div class="value" id="dTotalProfit">0</div></div>
+      <div class="stat"><div class="label">AVG PROFIT / RAID</div><div class="value" id="dAvgProfit">0</div></div>
+      <div class="stat"><div class="label">PROFIT / HOUR</div><div class="value" id="dProfitPerHour">0</div></div>
+      <div class="stat"><div class="label">WORTH-IT RATE</div><div class="value" id="dWorthRate">0%</div></div>
+      <div class="stat"><div class="label">TOTAL KOEN EARNED</div><div class="value good" id="dEarned">0</div></div>
+      <div class="stat"><div class="label">TOTAL KOEN LOST</div><div class="value bad" id="dLost">0</div></div>
+      <div class="stat"><div class="label">EXTRACTION STREAK</div><div class="value" id="dExtractStreak">0</div></div>
+      <div class="stat"><div class="label">BEST EXTRACTION STREAK</div><div class="value" id="dBestExtractStreak">0</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Koen goal</h2>
+      <div class="goalRow">
+        <input id="goalInput" type="number" min="0" placeholder="Set a Koen goal, e.g. 5000000">
+        <button class="secondary" onclick="setGoal()">Set goal</button>
+      </div>
+      <div class="barTrack"><div class="barFill" id="goalBar"></div></div>
+      <div class="goalMeta"><span id="goalCurrent">Current: 0 Koen</span><span id="goalTargetOnly">No goal set</span></div>
+      <div class="dashGrid" style="margin-top:14px;grid-template-columns:repeat(3,1fr)">
+        <div class="stat"><div class="label">REMAINING</div><div class="value" id="goalRemaining">—</div></div>
+        <div class="stat"><div class="label">PROGRESS</div><div class="value" id="goalProgress">0%</div></div>
+        <div class="stat"><div class="label">EST. RAIDS NEEDED</div><div class="value" id="goalRaidsNeeded">—</div></div>
+      </div>
+      <div class="pace" id="goalPace"></div>
+
+      <div class="graphWrap">
+        <svg class="graph" id="goalGraph" viewBox="0 0 600 170" preserveAspectRatio="none">
+          <defs><linearGradient id="gGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d9ff3f" stop-opacity=".55"/><stop offset="100%" stop-color="#d9ff3f" stop-opacity="0"/></linearGradient></defs>
+        </svg>
+        <div class="note">Cumulative Koen profit across all logged raids. Dashed line marks your goal.</div>
+      </div>
+    </div>
+
+    <div class="card sessionList" style="margin-top:18px">
+      <h2>Sessions</h2>
+      <div style="overflow:auto"><table><thead><tr><th>Session</th><th>Started</th><th>Duration</th><th>Raids</th><th>Profit</th></tr></thead><tbody id="sessionBody"><tr><td colspan="5" class="muted">No sessions logged yet.</td></tr></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="history" class="hidden history">
+    <div class="card">
+      <h2>Raid history</h2>
+      <div class="result" style="margin-bottom:15px">
+        <div class="stat"><div class="label">TOTAL PROFIT</div><div class="value" id="hProfit">0</div></div>
+        <div class="stat"><div class="label">AVERAGE PROFIT / RAID</div><div class="value" id="hAvg">0</div></div>
+        <div class="stat"><div class="label">RAIDS</div><div class="value" id="hRaids">0</div></div>
+        <div class="stat"><div class="label">EXTRACTION RATE</div><div class="value" id="hExtract">0%</div></div>
+      </div>
+      <div style="overflow:auto"><table><thead><tr><th>#</th><th>Session</th><th>Type</th><th>Kit</th><th>Loot</th><th>Profit</th><th>Worth it?</th><th>Status</th><th>Notes</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+      <div class="actions"><button class="secondary" onclick="exportCSV()">Export CSV</button><button class="danger secondary" onclick="clearHistory()">Clear history</button></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const defaults=["Helmet","Armor","Rig","Backpack","Primary weapon","Secondary weapon","Ammo","Magazines","Attachments","Meds","Grenades"];
+const kitRows=document.getElementById('kitRows');
+let raids=JSON.parse(localStorage.getItem('abiRaids')||'[]');
+let sessions=JSON.parse(localStorage.getItem('abiSessions')||'[]');
+let activeSession=JSON.parse(localStorage.getItem('abiActiveSession')||'null');
+let goal=+localStorage.getItem('abiGoal')||0;
+let timerInterval=null;
+let carryKit=+localStorage.getItem('abiCarryKit')||0;
+
+function toggleTheme(){
+ const isLight=document.body.classList.toggle('light');
+ localStorage.setItem('abiTheme',isLight?'light':'dark');
+ document.getElementById('themeBtn').textContent=isLight?'☀️ Light':'🌙 Dark';
+}
+if(localStorage.getItem('abiTheme')==='light'){document.body.classList.add('light');}
+
+function playGoalSound(){
+ try{
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  [0,0.15,0.3].forEach((t,i)=>{
+   const o=ctx.createOscillator(),g=ctx.createGain();
+   o.frequency.value=660+i*220;o.type='sine';
+   g.gain.setValueAtTime(0.001,ctx.currentTime+t);
+   g.gain.linearRampToValueAtTime(0.2,ctx.currentTime+t+0.02);
+   g.gain.linearRampToValueAtTime(0.001,ctx.currentTime+t+0.18);
+   o.connect(g);g.connect(ctx.destination);
+   o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+0.2);
+  });
+ }catch(e){}
+}
+
+function money(n){return new Intl.NumberFormat('en-US').format(Math.round(n||0))+" Koen"}
+function addKitRow(name="",value=""){
+ const d=document.createElement('div');d.className='row';
+ d.innerHTML=`<input placeholder="Item name" value="${name}"><input class="price" type="number" min="0" placeholder="Koen" value="${value}">`;
+ d.querySelector('.price').addEventListener('input',updateKit);
+ kitRows.appendChild(d);
+}
+defaults.forEach(x=>addKitRow(x));
+function updateKit(){
+ const manual=+document.getElementById('manualKit').value||0;
+ let total=manual>0?manual:[...document.querySelectorAll('.price')].reduce((a,x)=>a+(+x.value||0),0);
+ document.getElementById('kitTotal').textContent=money(total);return total
+}
+function useManualKit(){
+ const manual=+document.getElementById('manualKit').value||0;
+ if(manual>0){
+   document.getElementById('kitTotal').textContent=money(manual);
+   document.querySelectorAll('.price').forEach(x=>x.disabled=true);
+ }else{
+   document.querySelectorAll('.price').forEach(x=>x.disabled=false);
+   updateKit();
+ }
+}
+
+function toggleSession(){
+ if(activeSession){ endSession(); } else { startSession(); }
+}
+function startSession(){
+ const name=document.getElementById('sessionName').value.trim()||('Session '+(sessions.length+1));
+ activeSession={id:Date.now(),name,start:Date.now(),raidIds:[]};
+ localStorage.setItem('abiActiveSession',JSON.stringify(activeSession));
+ renderSessionBar();
+}
+function endSession(){
+ if(!activeSession)return;
+ const raidsInSession=raids.filter(r=>r.sessionId===activeSession.id);
+ const profit=raidsInSession.reduce((a,r)=>a+r.profit,0);
+ sessions.unshift({...activeSession,end:Date.now(),raidCount:raidsInSession.length,profit});
+ localStorage.setItem('abiSessions',JSON.stringify(sessions));
+ activeSession=null;
+ localStorage.removeItem('abiActiveSession');
+ document.getElementById('sessionName').value='';
+ renderSessionBar();renderDashboard();
+}
+function fmtDuration(ms){
+ const s=Math.floor(ms/1000);const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+ return (h>0?h+"h ":"")+m+"m "+sec+"s";
+}
+function renderSessionBar(){
+ const dot=document.getElementById('sessionDot'), label=document.getElementById('sessionLabel'),
+       timer=document.getElementById('sessionTimer'), btn=document.getElementById('sessionBtn'),
+       stats=document.getElementById('sessionStats');
+ if(timerInterval)clearInterval(timerInterval);
+ if(activeSession){
+   dot.classList.add('live');
+   label.textContent=activeSession.name;
+   btn.textContent='End Session';
+   document.getElementById('sessionName').style.display='none';
+   const tick=()=>{ timer.textContent=fmtDuration(Date.now()-activeSession.start); };
+   tick(); timerInterval=setInterval(tick,1000);
+   const raidsInSession=raids.filter(r=>r.sessionId===activeSession.id);
+   const profit=raidsInSession.reduce((a,r)=>a+r.profit,0);
+   stats.innerHTML=`<div class="mini">RAIDS<b>${raidsInSession.length}</b></div><div class="mini">SESSION PROFIT<b class="${profit>=0?'good':'bad'}">${profit>=0?'+':''}${money(profit)}</b></div>`;
+ }else{
+   dot.classList.remove('live');
+   label.textContent='No active session';
+   timer.textContent='—';
+   btn.textContent='Start Session';
+   document.getElementById('sessionName').style.display='';
+   stats.innerHTML='';
+ }
+}
+
+function verdict(kit,loot,extra,profit,status){
+ const cost=kit+extra;
+ const roi=cost>0?(profit/cost*100):(profit>0?100:0);
+ const recent=raids.slice(0,10);
+ const avgRecent=recent.length?recent.reduce((a,r)=>a+r.profit,0)/recent.length:0;
+ const breakEven=cost;
+ let tag,cls,text;
+ if(status==='Died'&&profit<0){tag='NOT WORTH IT';cls='bad';text='Died with a loss — kit cost more than what was recovered.';}
+ else if(profit<0){tag='NOT WORTH IT';cls='bad';text='Net loss this raid.';}
+ else if(roi<10){tag='MARGINAL';cls='warn';text='Positive but thin margin relative to kit cost.';}
+ else if(profit>avgRecent||avgRecent===0){tag='WORTH IT';cls='good';text='Profit beat your recent average.';}
+ else{tag='WORTH IT';cls='warn';text='Profitable, but below your recent average.';}
+ return {tag,cls,text,roi,avgRecent,breakEven,cost};
+}
+function calculate(){
+ const enteredKit=updateKit(), loot=+document.getElementById('loot').value||0, extra=+document.getElementById('extra').value||0;
+ const status=document.getElementById('status').value, type=document.getElementById('raidType').value;
+ const notes=document.getElementById('notes').value.trim();
+ // kit carries over across raids until a death is logged
+ const kit=carryKit>0?carryKit:enteredKit;
+ const profit=loot-kit-extra;
+ document.getElementById('rKit').textContent=money(kit);document.getElementById('rLoot').textContent=money(loot);
+ document.getElementById('rCost').textContent=money(kit+extra);
+ const p=document.getElementById('rProfit');p.textContent=(profit>=0?"+":"")+money(profit);p.className="value "+(profit>=0?"good":"bad");
+
+ const v=verdict(kit,loot,extra,profit,status);
+ const box=document.getElementById('verdictBox');box.classList.remove('hidden');
+ box.className='verdict '+v.cls;
+ document.getElementById('verdictBadge').textContent=(v.cls==='good'?'✅ ':v.cls==='bad'?'❌ ':'⚠️ ')+v.tag;
+ document.getElementById('verdictText').textContent=v.text+` (recent avg ${money(v.avgRecent)})`;
+ document.getElementById('vProfit').textContent=(profit>=0?'+':'')+money(profit);
+ document.getElementById('vProfit').className='value '+(profit>=0?'good':'bad');
+ document.getElementById('vKitCost').textContent=money(v.cost);
+ document.getElementById('vRoi').textContent=(v.roi>=0?'+':'')+v.roi.toFixed(1)+'%';
+ document.getElementById('vBreakEven').textContent=money(v.breakEven);
+
+ if(!activeSession)startSession();
+ const beforeTotal=raids.reduce((a,r)=>a+r.profit,0);
+ raids.unshift({type,kit,loot,extra,profit,status,notes,date:new Date().toLocaleString(),ts:Date.now(),sessionId:activeSession.id,sessionName:activeSession.name,worthIt:v.tag});
+ localStorage.setItem('abiRaids',JSON.stringify(raids));
+
+ // carry-over: reset kit only on death, otherwise persist it
+ if(status==='Died'){
+  carryKit=0;
+ }else{
+  carryKit=kit;
+ }
+ localStorage.setItem('abiCarryKit',carryKit);
+ document.getElementById('carryNote').innerHTML=carryKit>0
+  ? `Carrying <b>${money(carryKit)}</b> kit value into your next raid. Log a <b>Died</b> result to reset it.`
+  : `Your kit value carries over into your next raid as long as you keep extracting. It only resets when you log a <b>Died</b> result.`;
+ document.getElementById('notes').value='';
+
+ // goal sound alert
+ const afterTotal=beforeTotal+profit;
+ if(goal>0&&beforeTotal<goal&&afterTotal>=goal){playGoalSound();}
+
+ renderHistory();renderSessionBar();renderDashboard();
+}
+
+function renderHistory(){
+ const body=document.getElementById('historyBody');body.innerHTML='';
+ raids.forEach((r,i)=>{const tr=document.createElement('tr');
+  const wCls=r.worthIt==='WORTH IT'?'good':(r.worthIt==='MARGINAL'?'warn':'bad');
+  tr.innerHTML=`<td>${raids.length-i}</td><td>${r.sessionName||'—'}</td><td>${r.type}</td><td>${money(r.kit)}</td><td>${money(r.loot)}</td><td class="${r.profit>=0?'good':'bad'}">${r.profit>=0?'+':''}${money(r.profit)}</td><td class="${wCls}">${r.worthIt||'—'}</td><td>${r.status}</td><td class="muted" style="max-width:220px;white-space:normal">${r.notes||''}</td>`;
+  body.appendChild(tr)});
+ const total=raids.reduce((a,r)=>a+r.profit,0), extracted=raids.filter(r=>r.status==="Extracted").length;
+ document.getElementById('hProfit').textContent=(total>=0?"+":"")+money(total);
+ document.getElementById('hAvg').textContent=money(raids.length?total/raids.length:0);
+ document.getElementById('hRaids').textContent=raids.length;
+ document.getElementById('hExtract').textContent=(raids.length?(extracted/raids.length*100):0).toFixed(1)+"%";
+}
+
+function setGoal(){
+ const g=+document.getElementById('goalInput').value||0;
+ if(g>0){goal=g;localStorage.setItem('abiGoal',goal);}
+ renderDashboard();
+}
+function renderDashboard(){
+ const total=raids.reduce((a,r)=>a+r.profit,0);
+ const avg=raids.length?total/raids.length:0;
+ const worthCount=raids.filter(r=>r.worthIt==='WORTH IT').length;
+ const earned=raids.reduce((a,r)=>a+(r.profit>0?r.profit:0),0);
+ const lost=raids.reduce((a,r)=>a+(r.profit<0?-r.profit:0),0);
+ const allSessions=activeSession?[...sessions,{...activeSession,end:Date.now()}]:sessions;
+ const totalMs=allSessions.reduce((a,s)=>a+((s.end||Date.now())-s.start),0);
+ const totalHours=totalMs/3600000;
+ document.getElementById('dTotalProfit').textContent=(total>=0?'+':'')+money(total);
+ document.getElementById('dTotalProfit').className='value '+(total>=0?'good':'bad');
+ document.getElementById('dAvgProfit').textContent=money(avg);
+ document.getElementById('dProfitPerHour').textContent=totalHours>0?money(total/totalHours)+'/hr':'—';
+ document.getElementById('dWorthRate').textContent=(raids.length?(worthCount/raids.length*100):0).toFixed(1)+'%';
+ document.getElementById('dEarned').textContent=money(earned);
+ document.getElementById('dLost').textContent=money(lost);
+
+ const bar=document.getElementById('goalBar');
+ const cur=document.getElementById('goalCurrent'), tgtOnly=document.getElementById('goalTargetOnly');
+ cur.textContent='Current: '+money(Math.max(total,0));
+ if(goal>0){
+  const pct=Math.min(100,Math.max(0,total/goal*100));
+  const remaining=Math.max(goal-total,0);
+  bar.style.width=pct+'%';
+  tgtOnly.textContent='Goal: '+money(goal);
+  document.getElementById('goalRemaining').textContent=remaining>0?money(remaining):'Reached!';
+  document.getElementById('goalProgress').textContent=pct.toFixed(1)+'%';
+  document.getElementById('goalRaidsNeeded').textContent=(remaining<=0)?'0':(avg>0?Math.ceil(remaining/avg):'—');
+  document.getElementById('goalInput').value=goal;
+ }else{
+  bar.style.width='0%';
+  tgtOnly.textContent='No goal set';
+  document.getElementById('goalRemaining').textContent='—';
+  document.getElementById('goalProgress').textContent='0%';
+  document.getElementById('goalRaidsNeeded').textContent='—';
+ }
+
+ drawGraph(total);
+ renderSessionsTable();
+ renderStreakAndExtremes();
+ renderPace(total,avg);
+}
+function renderStreakAndExtremes(){
+ const streakEl=document.getElementById('dStreak'), bestEl=document.getElementById('dBest'), worstEl=document.getElementById('dWorst');
+ const extStreakEl=document.getElementById('dExtractStreak'), bestExtStreakEl=document.getElementById('dBestExtractStreak');
+ if(raids.length===0){streakEl.textContent='—';bestEl.textContent='—';worstEl.textContent='—';extStreakEl.textContent='0';bestExtStreakEl.textContent='0';return;}
+ // raids[0] is most recent; count consecutive same-sign streak from the top
+ let streak=0; const sign=raids[0].profit>=0;
+ for(const r of raids){ if((r.profit>=0)===sign){streak++;} else break; }
+ streakEl.textContent=(sign?'+':'-')+streak+(streak===1?' raid':' raids');
+ streakEl.className='value '+(sign?'good':'bad');
+ const best=raids.reduce((a,r)=>r.profit>a.profit?r:a,raids[0]);
+ const worst=raids.reduce((a,r)=>r.profit<a.profit?r:a,raids[0]);
+ bestEl.textContent=(best.profit>=0?'+':'')+money(best.profit)+' ('+best.type+')';
+ worstEl.textContent=(worst.profit>=0?'+':'')+money(worst.profit)+' ('+worst.type+')';
+
+ // extraction streak: current consecutive "Extracted" raids from most recent, and longest ever (in chronological order)
+ let curExtract=0;
+ for(const r of raids){ if(r.status==='Extracted'){curExtract++;} else break; }
+ extStreakEl.textContent=curExtract;
+ let bestExtract=0,running=0;
+ for(const r of [...raids].reverse()){ // oldest to newest
+  if(r.status==='Extracted'){running++;bestExtract=Math.max(bestExtract,running);} else {running=0;}
+ }
+ bestExtStreakEl.textContent=bestExtract;
+}
+function renderPace(total,avg){
+ const el=document.getElementById('goalPace');
+ if(goal<=0){el.textContent='';return;}
+ const remaining=goal-total;
+ if(remaining<=0){el.textContent='🎯 Goal reached!';return;}
+ if(avg<=0){el.textContent="At your current average, you're not on pace to reach this goal — average profit per raid is zero or negative.";return;}
+ const raidsNeeded=Math.ceil(remaining/avg);
+ el.textContent=`At your current average (${money(avg)}/raid), ~${raidsNeeded} more raid${raidsNeeded===1?'':'s'} to reach your goal.`;
+}
+function drawGraph(total){
+ const svg=document.getElementById('goalGraph');
+ const w=600,h=170,pad=24;
+ [...svg.querySelectorAll('.plotted')].forEach(el=>el.remove());
+ const ordered=[...raids].reverse();
+ if(ordered.length===0){
+   const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+   t.setAttribute('class','plotted');t.setAttribute('x',w/2);t.setAttribute('y',h/2);t.setAttribute('text-anchor','middle');
+   t.textContent='Log raids to see your Koen curve';
+   svg.appendChild(t);return;
+ }
+ let cum=0; const pts=ordered.map(r=>{cum+=r.profit;return cum;});
+ const maxVal=Math.max(...pts,goal||0,1);
+ const minVal=Math.min(...pts,0);
+ const range=(maxVal-minVal)||1;
+ const xStep=(w-pad*2)/Math.max(pts.length-1,1);
+ const toY=v=>h-pad-((v-minVal)/range)*(h-pad*2);
+ const toX=i=>pad+i*xStep;
+
+ if(minVal<0){
+  const zy=toY(0);
+  const zero=document.createElementNS('http://www.w3.org/2000/svg','line');
+  zero.setAttribute('class','plotted zero');zero.setAttribute('x1',pad);zero.setAttribute('x2',w-pad);zero.setAttribute('y1',zy);zero.setAttribute('y2',zy);
+  svg.appendChild(zero);
+ }
+ if(goal>0){
+  const gy=toY(goal);
+  const gline=document.createElementNS('http://www.w3.org/2000/svg','line');
+  gline.setAttribute('class','plotted goalLine');gline.setAttribute('x1',pad);gline.setAttribute('x2',w-pad);gline.setAttribute('y1',gy);gline.setAttribute('y2',gy);
+  svg.appendChild(gline);
+  const gt=document.createElementNS('http://www.w3.org/2000/svg','text');
+  gt.setAttribute('class','plotted');gt.setAttribute('x',w-pad);gt.setAttribute('y',gy-4);gt.setAttribute('text-anchor','end');
+  gt.textContent='Goal';svg.appendChild(gt);
+ }
+ let d='M'+toX(0)+' '+toY(pts[0]);
+ pts.forEach((v,i)=>{if(i>0)d+=' L'+toX(i)+' '+toY(v);});
+ const areaD=d+` L${toX(pts.length-1)} ${h-pad} L${toX(0)} ${h-pad} Z`;
+ const area=document.createElementNS('http://www.w3.org/2000/svg','path');
+ area.setAttribute('class','plotted area');area.setAttribute('d',areaD);svg.appendChild(area);
+ const line=document.createElementNS('http://www.w3.org/2000/svg','path');
+ line.setAttribute('class','plotted line');line.setAttribute('d',d);svg.appendChild(line);
+}
+function renderSessionsTable(){
+ const body=document.getElementById('sessionBody');
+ const list=[...sessions];
+ if(activeSession){
+  const raidsInSession=raids.filter(r=>r.sessionId===activeSession.id);
+  list.unshift({...activeSession,end:null,raidCount:raidsInSession.length,profit:raidsInSession.reduce((a,r)=>a+r.profit,0)});
+ }
+ if(list.length===0){body.innerHTML='<tr><td colspan="5" class="muted">No sessions logged yet.</td></tr>';return;}
+ body.innerHTML='';
+ list.forEach(s=>{
+  const tr=document.createElement('tr');
+  const dur=s.end?fmtDuration(s.end-s.start):fmtDuration(Date.now()-s.start)+' (live)';
+  tr.innerHTML=`<td>${s.name}</td><td>${new Date(s.start).toLocaleString()}</td><td>${dur}</td><td>${s.raidCount}</td><td class="${s.profit>=0?'good':'bad'}">${s.profit>=0?'+':''}${money(s.profit)}</td>`;
+  body.appendChild(tr);
+ });
+}
+
+function showTab(id,btn){
+ ['raid','dashboard','history'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
+ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
+ if(id==='history')renderHistory();
+ if(id==='dashboard')renderDashboard();
+}
+function clearHistory(){if(confirm("Delete all saved raid history, sessions, and goal progress?")){raids=[];sessions=[];activeSession=null;localStorage.removeItem('abiRaids');localStorage.removeItem('abiSessions');localStorage.removeItem('abiActiveSession');renderHistory();renderSessionBar();renderDashboard();}}
+function exportCSV(){
+ let csv="Raid,Session,Date,Type,Kit,Loot,Extra Costs,Profit,Worth It,Status,Notes\n";
+ raids.forEach((r,i)=>csv+=`${raids.length-i},"${r.sessionName||''}","${r.date}",${r.type},${r.kit},${r.loot},${r.extra},${r.profit},${r.worthIt||''},${r.status},"${(r.notes||'').replace(/"/g,'""')}"\n`);
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='abi-raid-history.csv';a.click();
+}
+
+if(document.body.classList.contains('light')){document.getElementById('themeBtn').textContent='☀️ Light';}
+if(carryKit>0){document.getElementById('carryNote').innerHTML=`Carrying <b>${money(carryKit)}</b> kit value into your next raid. Log a <b>Died</b> result to reset it.`;}
+updateKit();renderHistory();renderSessionBar();renderDashboard();
+</script>
+</body>
+</html>
