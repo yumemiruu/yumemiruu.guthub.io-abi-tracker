@@ -88,6 +88,7 @@ textarea:focus{border-color:#758000}
       </div>
       <input id="sessionName" placeholder="Session name (optional)" style="width:180px">
       <button class="secondary" id="sessionBtn" onclick="toggleSession()">Start Session</button>
+      <button class="secondary hidden" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
       <button class="secondary" id="redBtn" onclick="addRed()" style="color:var(--bad);font-weight:800">🔴 +1 Red</button>
     </div>
     <div class="sessionStats" id="sessionStats"></div>
@@ -300,7 +301,19 @@ function toggleSession(){
 }
 function startSession(){
  const name=document.getElementById('sessionName').value.trim()||('Session '+(sessions.length+1));
- activeSession={id:Date.now(),name,start:Date.now(),lastActivity:Date.now(),redCount:0,raidIds:[]};
+ activeSession={id:Date.now(),name,start:Date.now(),lastActivity:Date.now(),redCount:0,raidIds:[],paused:false,pausedMs:0,pauseStart:null};
+ localStorage.setItem('abiActiveSession',JSON.stringify(activeSession));
+ renderSessionBar();
+}
+function togglePause(){
+ if(!activeSession)return;
+ if(activeSession.paused){
+  activeSession.pausedMs=(activeSession.pausedMs||0)+(Date.now()-activeSession.pauseStart);
+  activeSession.paused=false;activeSession.pauseStart=null;
+  activeSession.lastActivity=Date.now();
+ }else{
+  activeSession.paused=true;activeSession.pauseStart=Date.now();
+ }
  localStorage.setItem('abiActiveSession',JSON.stringify(activeSession));
  renderSessionBar();
 }
@@ -315,6 +328,10 @@ function sessionIdleMs(session,raidsInSession,endTime){
 }
 function endSession(){
  if(!activeSession)return;
+ if(activeSession.paused){
+  activeSession.pausedMs=(activeSession.pausedMs||0)+(Date.now()-activeSession.pauseStart);
+  activeSession.paused=false;activeSession.pauseStart=null;
+ }
  const raidsInSession=raids.filter(r=>r.sessionId===activeSession.id);
  const profit=raidsInSession.reduce((a,r)=>a+r.profit,0);
  const end=Date.now();
@@ -341,14 +358,24 @@ function fmtDuration(ms){
 function renderSessionBar(){
  const dot=document.getElementById('sessionDot'), label=document.getElementById('sessionLabel'),
        timer=document.getElementById('sessionTimer'), btn=document.getElementById('sessionBtn'),
-       stats=document.getElementById('sessionStats');
+       pauseBtn=document.getElementById('pauseBtn'), stats=document.getElementById('sessionStats');
  if(timerInterval)clearInterval(timerInterval);
  if(activeSession){
    dot.classList.add('live');
    btn.textContent='End Session';
+   pauseBtn.classList.remove('hidden');
    document.getElementById('sessionName').style.display='none';
    const tick=()=>{
-    timer.textContent=fmtDuration(Date.now()-activeSession.start);
+    const effectiveNow=activeSession.paused?activeSession.pauseStart:Date.now();
+    const elapsed=Math.max((effectiveNow-activeSession.start)-(activeSession.pausedMs||0),0);
+    timer.textContent=fmtDuration(elapsed);
+    if(activeSession.paused){
+     dot.classList.remove('live');dot.style.background='var(--muted)';
+     label.textContent=activeSession.name+' — ⏸ paused';
+     pauseBtn.textContent='▶ Resume';
+     return;
+    }
+    pauseBtn.textContent='⏸ Pause';
     const idleNow=Date.now()-activeSession.lastActivity;
     if(idleNow>IDLE_MS){
      dot.classList.remove('live');dot.style.background='var(--warn)';
@@ -367,6 +394,7 @@ function renderSessionBar(){
    label.textContent='No active session';
    timer.textContent='—';
    btn.textContent='Start Session';
+   pauseBtn.classList.add('hidden');
    document.getElementById('sessionName').style.display='';
    stats.innerHTML=`<div class="mini">TOTAL REDS<b style="color:var(--bad)">${redCount}</b></div>`;
  }
